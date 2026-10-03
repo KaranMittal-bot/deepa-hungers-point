@@ -109,7 +109,6 @@ function getOrderCharges(cart, orderType) {
 }
 
 function App(){
-  const [intro, setIntro] = useState(true);
   const [category, setCategory] = useState("All");
   const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem("dhp-cart-v2") || "[]"));
   const [selected, setSelected] = useState(null);
@@ -118,6 +117,10 @@ function App(){
   const [toast, setToast] = useState("");
 
   useEffect(() => localStorage.setItem("dhp-cart-v2", JSON.stringify(cart)), [cart]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const filtered = useMemo(() => category === "All" ? menu : menu.filter(i => i.category === category), [category]);
   const totalItems = cart.reduce((a,i)=>a+i.qty,0);
@@ -142,37 +145,6 @@ function App(){
 
   return (
     <div className="app">
-      <AnimatePresence>
-        {intro && (
-          <motion.div className="intro" initial={{opacity:1}} exit={{opacity:0, y:-30}} transition={{duration:.7}}>
-            <div className="intro-glow intro-glow-one" />
-            <div className="intro-glow intro-glow-two" />
-            <motion.div className="intro-orbit orbit-one" animate={{rotate:360}} transition={{duration:18,repeat:Infinity,ease:"linear"}} />
-            <motion.div className="intro-orbit orbit-two" animate={{rotate:-360}} transition={{duration:12,repeat:Infinity,ease:"linear"}} />
-            <motion.div className="intro-spark spark-one" animate={{y:[0,-12,0],opacity:[.35,1,.35]}} transition={{duration:2.6,repeat:Infinity}}><Sparkles size={16}/></motion.div>
-            <motion.div className="intro-spark spark-two" animate={{y:[0,10,0],opacity:[.25,.9,.25]}} transition={{duration:3.1,repeat:Infinity,delay:.4}}><Sparkles size={12}/></motion.div>
-
-            <motion.div className="intro-content" initial={{opacity:0,scale:.9,y:20}} animate={{opacity:1,scale:1,y:0}} transition={{duration:1,ease:[.22,1,.36,1]}}>
-              <motion.div className="mark" initial={{scale:0,rotate:-20}} animate={{scale:1,rotate:0}} transition={{delay:.25,duration:.65,type:"spring",stiffness:180}}><UtensilsCrossed size={22}/></motion.div>
-              <motion.p className="eyebrow" initial={{opacity:0,letterSpacing:".35em"}} animate={{opacity:1,letterSpacing:".18em"}} transition={{delay:.45,duration:.7}}>WELCOME TO</motion.p>
-              <motion.h1 initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{delay:.55,duration:.7}}>Deepa Hunger's<br/><span>Point</span></motion.h1>
-              <motion.p className="tagline" initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:.8}}>Ghar Jaisa</motion.p>
-              <motion.p className="intro-description" initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:1,duration:.7}}>Warm meals. Familiar flavours.<br/>Made for good moments.</motion.p>
-              <motion.div className="intro-pills" initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:1.15,duration:.7}}>
-                <span>PARANTHAS</span><span>PANCAKES</span><span>CHAAT</span><span>SHAKES</span>
-              </motion.div>
-            </motion.div>
-            <motion.button className="intro-btn" onClick={()=>setIntro(false)}
-              initial={{opacity:0,y:18,scale:.96}} animate={{opacity:1,y:0,scale:1}} transition={{delay:1.35,duration:.6}} whileHover={{y:-3,scale:1.02}} whileTap={{scale:.97}}>
-              Explore Menu <ArrowRight size={17}/>
-            </motion.button>
-            <motion.div className="intro-scroll-hint" initial={{opacity:0}} animate={{opacity:1}} transition={{delay:1.7}}>
-              <span>YOUR TABLE AWAITS</span><ArrowDown size={14}/>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <header className="nav">
         <button className="brand" onClick={()=>scrollTo("home")}>
           <span className="brand-mark"><UtensilsCrossed size={17}/></span>
@@ -288,7 +260,19 @@ function App(){
       </AnimatePresence>
 
       <AnimatePresence>
-        {orderOpen && <OrderModal cart={cart} total={total} onClose={()=>setOrderOpen(false)}/>}
+        {orderOpen && (
+          <OrderModal
+            cart={cart}
+            total={total}
+            onClose={()=>setOrderOpen(false)}
+            onOrderComplete={()=>{
+              localStorage.removeItem("dhp-cart-v2");
+              setCart([]);
+              setOrderOpen(false);
+              setCartOpen(false);
+            }}
+          />
+)}
       </AnimatePresence>
     </div>
   );
@@ -325,7 +309,7 @@ function CartModal({cart,total,onClose,onChange,onRemove,onOrder}){
   </div>
 }
 
-function OrderModal({cart,total,onClose}){
+function OrderModal({cart,total,onClose,onOrderComplete}){
   const [type,setType] = useState("Dine-in");
   const [name,setName] = useState("");
   const [phone,setPhone] = useState("");
@@ -334,14 +318,14 @@ function OrderModal({cart,total,onClose}){
   const { packing, delivery } = getOrderCharges(cart, type);
   const finalTotal = total + packing + delivery;
 
-  const valid = type !== "Delivery" || address.trim().length > 4;
+  const valid = name.trim().length > 1 && phone.trim().length >= 10 && (type !== "Delivery" || address.trim().length > 4);
 
   const send = () => {
-    if(!valid) return;
+      if(!valid) return;
 
-    const lines = cart
-      .map(x =>
-        `• ${x.qty} × ${x.name}${
+  const lines = cart
+    .map(x =>
+      `• ${x.qty} × ${x.name}${
           x.variant && x.variant !== "Regular"
             ? ` — ${x.variant}`
             : ""
@@ -391,6 +375,8 @@ Please confirm the order after payment verification.`;
       `https://wa.me/${RESTAURANT.whatsapp}?text=${encodeURIComponent(msg)}`,
       "_blank"
     );
+
+    onOrderComplete();
   };
 
   return (
